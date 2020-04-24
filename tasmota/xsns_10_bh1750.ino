@@ -1,5 +1,5 @@
 /*
-  xsns_10_bh1750.ino - BH1750 ambient light sensor support for Tasmota
+  xsns_68_VEML7700.ino - VML7700 ambient light sensor support for Tasmota
 
   Copyright (C) 2020  Theo Arends
 
@@ -18,15 +18,15 @@
 */
 
 #ifdef USE_I2C
-#ifdef USE_BH1750
+#ifdef USE_VEML7700
 /*********************************************************************************************\
- * BH1750 - Ambient Light Intensity
+ * VEML7700 - Ambient Light Intensity
  *
- * I2C Address: 0x23 or 0x5C
+ * I2C Address: 0x10
 \*********************************************************************************************/
 
-#define XSNS_10                          10
-#define XI2C_11                          11    // See I2CDEVICES.md
+#define XSNS_68                          68
+#define XI2C_11                          48    // See I2CDEVICES.md
 
 #define BH1750_ADDR1                     0x23
 #define BH1750_ADDR2                     0x5C
