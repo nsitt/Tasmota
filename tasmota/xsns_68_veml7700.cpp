@@ -26,9 +26,65 @@
 \*********************************************************************************************/
 
 #define XSNS_68                          68
-#define XI2C_68                          49     // See I2CDEVICES.md
+#define XI2C_49                          49     // See I2CDEVICES.md
 
 #define VEML7700_ADDR                    0x10   //< I2C address
+
+
+//#define VEML6070_ADDR_H             0x39            // on some PCB boards the address can be changed by a solder point,
+//#define VEML6070_ADDR_L             0x38            // to have no address conflicts with other I2C sensors and/or hardware
+#define VEML7770_INTEGRATION_TIME   3               // // binary 0011 = 800msec integration time
+#define VEML7700_ENABLE             1               //
+#define VEML7700_DISABLE            0               //
+//#define VEML6070_RSET_DEFAULT       270000          // 270K default resistor value 270000 ohm, range from 220K..1Meg
+//#define VEML6070_UV_MAX_INDEX       15              // normal 11, internal on weather laboratories and NASA it's 15 so far the sensor is linear
+//#define VEML6070_UV_MAX_DEFAULT     11              // 11 = public default table values
+#define VEML6070_POWER_COEFFCIENT   0.025           // based on calculations from Karel Vanicek and reorder by hand
+#define VEML6070_TABLE_COEFFCIENT   32.86270591     // calculated by hand with help from a friend of mine, a professor which works in aero space things
+                                                    // (resistor, differences, power coefficients and official UV index calculations (LAT & LONG will be added later)
+
+/********************************************************************************************/
+
+// globals
+const char kVemlTypes[] PROGMEM = "VEML7700";       // one sensor known
+//double     uv_risk_map[VEML6070_UV_MAX_INDEX] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+//double     uvrisk             = 0;
+//double     uvpower            = 0;
+uint16_t   light_level            = 0;
+uint16_t   white_level            = 0;
+//uint8_t    veml7700_addr  = VEML6070_ADDR_L;
+//uint8_t    veml6070_addr_high = VEML6070_ADDR_H;
+uint8_t    itime              = VEML7700_INTEGRATION_TIME;
+uint8_t    veml7700_type      = 0;
+char       veml7700_name[9];
+//char       str_uvrisk_text[10];
+
+
+
+void Veml7700Detect(void)
+{
+  if (I2cActive(VEML7700_ADDR)) { return; }
+
+  // init the UV sensor
+  Wire.beginTransmission(VEML7700_ADDR);
+  Wire.write((itime << 2) | 0x02);
+  uint8_t status   = Wire.endTransmission();
+  // action on status
+  if (!status) {
+    veml6070_type      = 1;
+    Veml6070UvTableInit();    // 1[ms], initalize the UV compare table only once
+    uint8_t veml_model = 0;
+    GetTextIndexed(veml6070_name, sizeof(veml6070_name), veml_model, kVemlTypes);
+    I2cSetActiveFound(VEML6070_ADDR_L, veml6070_name);
+  }
+}
+
+/********************************************************************************************/
+
+
+
+
+/////////
 
 
 #define VEML7700_ALS_CONFIG          0x00  ///< Light configuration register
@@ -47,12 +103,12 @@
 #define VEML7700_GAIN_1_8           0x02  ///< ALS gain 1/8x
 #define VEML7700_GAIN_1_4           0x03  ///< ALS gain 1/4x
 
-#define VEML7700_IT_100MS           0x00  ///< ALS intetgration time 100ms
-#define VEML7700_IT_200MS           0x01  ///< ALS intetgration time 200ms
-#define VEML7700_IT_400MS           0x02  ///< ALS intetgration time 400ms
-#define VEML7700_IT_800MS           0x03  ///< ALS intetgration time 800ms
-#define VEML7700_IT_50MS            0x08  ///< ALS intetgration time 50ms
-#define VEML7700_IT_25MS            0x0C  ///< ALS intetgration time 25ms
+#define VEML7700_IT_100MS           0x00  ///< ALS integration time 100ms
+#define VEML7700_IT_200MS           0x01  ///< ALS integration time 200ms
+#define VEML7700_IT_400MS           0x02  ///< ALS integration time 400ms
+#define VEML7700_IT_800MS           0x03  ///< ALS integration time 800ms
+#define VEML7700_IT_50MS            0x08  ///< ALS integration time 50ms
+#define VEML7700_IT_25MS            0x0C  ///< ALS integration time 25ms
 
 #define VEML7700_PERS_1             0x00  ///< ALS irq persisance 1 sample
 #define VEML7700_PERS_2             0x01  ///< ALS irq persisance 2 samples
@@ -63,8 +119,6 @@
 #define VEML7700_POWERSAVE_MODE2    0x01  ///< Power saving mode 2
 #define VEML7700_POWERSAVE_MODE3    0x02  ///< Power saving mode 3
 #define VEML7700_POWERSAVE_MODE4    0x03  ///< Power saving mode 4
-
-
 
 #define VEML7700_CONTINUOUS_HIGH_RES_MODE2 0x11  // Start measurement at 0.5 lx resolution. Measurement time is approx 120ms.
 #define VEML7700_CONTINUOUS_HIGH_RES_MODE  0x10  // Start measurement at 1   lx resolution. Measurement time is approx 120ms.

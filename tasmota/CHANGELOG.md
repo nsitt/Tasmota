@@ -1,5 +1,6 @@
 ## Unreleased (development)
 
+<<<<<<< HEAD
 ### 8.2.0.4 20200417
 
 - Change PWM implementation to Arduino #7231 removing support for Core versions before 2.6.3
@@ -57,11 +58,17 @@
 - Add support for unreachable (unplugged) Zigbee devices in Philips Hue emulation and Alexa
 - Add support for 64x48 SSD1306 OLED (#6740)
 
+=======
+>>>>>>> origin/master
 ## Released
 
 ### 8.2.0 20200321
 
+<<<<<<< HEAD
 - Release Elliot
+=======
+- Release
+>>>>>>> origin/master
 
 ### 8.1.0.11 20200313
 
