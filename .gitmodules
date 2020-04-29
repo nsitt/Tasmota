@@ -1,0 +1,3 @@
+[submodule "Adafruit_VEML7700"]
+	path = Adafruit_VEML7700
+	url = https://github.com/adafruit/Adafruit_VEML7700
