@@ -119,6 +119,7 @@
 | USE_WEMOS_MOTOR_V1    | - | - | - | - | x | - | - |
 | USE_IAQ               | - | - | - | - | x | - | - |
 | USE_AS3935            | - | - | - | - | x | - | - |
+| USE_VEML7700          | - | - | - | - | x | - | - |
 |                       |   |   |   |   |   |   |   |
 | Feature or Sensor     | minimal | lite | tasmota | knx | sensors | ir | display | Remarks
 | USE_SPI               | - | - | - | - | - | - | x |

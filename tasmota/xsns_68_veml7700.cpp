@@ -31,250 +31,101 @@
 #define VEML7700_ADDR                    0x10   //< I2C address
 
 
-//#define VEML6070_ADDR_H             0x39            // on some PCB boards the address can be changed by a solder point,
-//#define VEML6070_ADDR_L             0x38            // to have no address conflicts with other I2C sensors and/or hardware
-#define VEML7770_INTEGRATION_TIME   3               // // binary 0011 = 800msec integration time
-#define VEML7700_ENABLE             1               //
-#define VEML7700_DISABLE            0               //
-//#define VEML6070_RSET_DEFAULT       270000          // 270K default resistor value 270000 ohm, range from 220K..1Meg
-//#define VEML6070_UV_MAX_INDEX       15              // normal 11, internal on weather laboratories and NASA it's 15 so far the sensor is linear
-//#define VEML6070_UV_MAX_DEFAULT     11              // 11 = public default table values
-#define VEML6070_POWER_COEFFCIENT   0.025           // based on calculations from Karel Vanicek and reorder by hand
-#define VEML6070_TABLE_COEFFCIENT   32.86270591     // calculated by hand with help from a friend of mine, a professor which works in aero space things
-                                                    // (resistor, differences, power coefficients and official UV index calculations (LAT & LONG will be added later)
+#include "Adafruit_VEML7700.h"
+Adafruit_VEML7700 veml7700_sensor;
+
+uint8_t veml7700_ready = 0;
+uint16_t lux_value;
+uint16_t white_value;
+uint16_t rawals_value;
+uint16_t nits_value;
 
 /********************************************************************************************/
 
-// globals
-const char kVemlTypes[] PROGMEM = "VEML7700";       // one sensor known
-//double     uv_risk_map[VEML6070_UV_MAX_INDEX] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-//double     uvrisk             = 0;
-//double     uvpower            = 0;
-uint16_t   light_level            = 0;
-uint16_t   white_level            = 0;
-//uint8_t    veml7700_addr  = VEML6070_ADDR_L;
-//uint8_t    veml6070_addr_high = VEML6070_ADDR_H;
-uint8_t    itime              = VEML7700_INTEGRATION_TIME;
-uint8_t    veml7700_type      = 0;
-char       veml7700_name[9];
-//char       str_uvrisk_text[10];
-
-
-
-void Veml7700Detect(void)
+void Veml7700Detect()
 {
-  if (I2cActive(VEML7700_ADDR)) { return; }
+  if (veml7700_ready) {
+    AddLog_P(LOG_LEVEL_DEBUG, PSTR("VEML7700 is ready"));
+    return;
+  }
 
-  // init the UV sensor
-  Wire.beginTransmission(VEML7700_ADDR);
-  Wire.write((itime << 2) | 0x02);
-  uint8_t status   = Wire.endTransmission();
-  // action on status
-  if (!status) {
-    veml6070_type      = 1;
-    Veml6070UvTableInit();    // 1[ms], initalize the UV compare table only once
-    uint8_t veml_model = 0;
-    GetTextIndexed(veml6070_name, sizeof(veml6070_name), veml_model, kVemlTypes);
-    I2cSetActiveFound(VEML6070_ADDR_L, veml6070_name);
+  if (!veml7700_sensor.begin()) {
+    AddLog_P(LOG_LEVEL_DEBUG, PSTR("Unable to init VEML7700 Sensor."));
+    return;
+  }
+
+  veml7700_ready = 1;
+
+  snprintf_P(log_data, sizeof(log_data), S_LOG_I2C_FOUND_AT, "VEML7700", VEML7700_I2CADDR_DEFAULT);
+  AddLog(LOG_LEVEL_DEBUG);
+}
+
+void Veml7700_Every_Second(void) {
+  if (veml7700_ready) {
+    lux_value = veml7700_sensor.readLux();
+    white_value = veml7700_sensor.readWhite();
+    rawals_value = veml7700_sensor.readALS();
+    nits_value = lux_value / 3.14159265359;
   }
 }
 
-/********************************************************************************************/
+#define D_rawals_value "Raw ALS"
+#define D_lux_value "Lux"
+#define D_white_value "White"
+#define D_nits_value "Nits"
+#define D_JSON_rawals_value "Raw ALS"
+#define D_JSON_lux_value "Lux"
+#define D_JSON_white_value "White"
+#define D_JSON_nits_value "Nits"
 
 
-
-
-/////////
-
-
-#define VEML7700_ALS_CONFIG          0x00  ///< Light configuration register
-#define VEML7700_ALS_THREHOLD_HIGH   0x01  ///< Light high threshold for irq
-#define VEML7700_ALS_THREHOLD_LOW    0x02  ///< Light low threshold for irq
-#define VEML7700_ALS_POWER_SAVE      0x03  ///< Power save regiester
-#define VEML7700_ALS_DATA            0x04  ///< The light data output
-#define VEML7700_WHITE_DATA          0x05  ///< The white light data output
-#define VEML7700_INTERRUPTSTATUS     0x06  ///< What IRQ (if any)
-
-#define VEML7700_INTERRUPT_HIGH     0x4000 ///< Interrupt status for high threshold
-#define VEML7700_INTERRUPT_LOW      0x8000 ///< Interrupt status for low threshold
-
-#define VEML7700_GAIN_1             0x00  ///< ALS gain 1x
-#define VEML7700_GAIN_2             0x01  ///< ALS gain 2x
-#define VEML7700_GAIN_1_8           0x02  ///< ALS gain 1/8x
-#define VEML7700_GAIN_1_4           0x03  ///< ALS gain 1/4x
-
-#define VEML7700_IT_100MS           0x00  ///< ALS integration time 100ms
-#define VEML7700_IT_200MS           0x01  ///< ALS integration time 200ms
-#define VEML7700_IT_400MS           0x02  ///< ALS integration time 400ms
-#define VEML7700_IT_800MS           0x03  ///< ALS integration time 800ms
-#define VEML7700_IT_50MS            0x08  ///< ALS integration time 50ms
-#define VEML7700_IT_25MS            0x0C  ///< ALS integration time 25ms
-
-#define VEML7700_PERS_1             0x00  ///< ALS irq persisance 1 sample
-#define VEML7700_PERS_2             0x01  ///< ALS irq persisance 2 samples
-#define VEML7700_PERS_4             0x02  ///< ALS irq persisance 4 samples
-#define VEML7700_PERS_8             0x03  ///< ALS irq persisance 8 samples
-
-#define VEML7700_POWERSAVE_MODE1    0x00  ///< Power saving mode 1
-#define VEML7700_POWERSAVE_MODE2    0x01  ///< Power saving mode 2
-#define VEML7700_POWERSAVE_MODE3    0x02  ///< Power saving mode 3
-#define VEML7700_POWERSAVE_MODE4    0x03  ///< Power saving mode 4
-
-#define VEML7700_CONTINUOUS_HIGH_RES_MODE2 0x11  // Start measurement at 0.5 lx resolution. Measurement time is approx 120ms.
-#define VEML7700_CONTINUOUS_HIGH_RES_MODE  0x10  // Start measurement at 1   lx resolution. Measurement time is approx 120ms.
-#define VEML7700_CONTINUOUS_LOW_RES_MODE   0x13  // Start measurement at 4   lx resolution. Measurement time is approx 16ms.
-
-#define VEML7700_MEASUREMENT_TIME_HIGH     0x40  // Measurement Time register high 3 bits
-#define VEML7700_MEASUREMENT_TIME_LOW      0x60  // Measurement Time register low 5 bits
-
-struct VEML7700DATA {
-  uint8_t address;
-  uint8_t gain[4] = {VEML7700_GAIN_1,VEML7700_GAIN_2,VEML7700_GAIN_1_8, VEML7700_GAIN_1_4};
-  uint8_t integration_time[6] = {VEML7700_IT_25MS,VEML7700_IT_50MS,VEML7700_IT_100MS, VEML7700_IT_200MS,VEML7700_IT_400MS, VEML7700_IT_800MS};
-  uint8_t power_save_mode[4] = {VEML7700_POWERSAVE_MODE1,VEML7700_POWERSAVE_MODE2, VEML7700_POWERSAVE_MODE3,VEML7700_POWERSAVE_MODE4};
-    VEML7700_POWERSAVE_MODE1
-  //uint8_t type = 0;
-  //uint8_t valid = 0;
-  //uint8_t mtreg = 69;                          // Default Measurement Time
-  uint16_t illuminance = 0;
-  char types[8] = "VEML7700";
-} VEML7700;
-
-/*********************************************************************************************/
-
-bool VEML7700SetResolution(void)
-{
-  Wire.beginTransmission(VEML7700.address);
-  Wire.write(VEML7700.resolution[Settings.SensorBits1.VEML7700_resolution]);
-  return (!Wire.endTransmission());
-}
-
-bool VEML7700SetMTreg(void)
-{
-  Wire.beginTransmission(VEML7700.address);
-  uint8_t data = VEML7700_MEASUREMENT_TIME_HIGH | ((VEML7700.mtreg >> 5) & 0x07);
-  Wire.write(data);
-  if (Wire.endTransmission()) { return false; }
-  Wire.beginTransmission(VEML7700.address);
-  data = VEML7700_MEASUREMENT_TIME_LOW | (VEML7700.mtreg & 0x1F);
-  Wire.write(data);
-  if (Wire.endTransmission()) { return false; }
-  return VEML7700SetResolution();
-}
-
-bool VEML7700Read(void)
-{
-  if (VEML7700.valid) { VEML7700.valid--; }
-
-  if (2 != Wire.requestFrom(VEML7700.address, (uint8_t)2)) { return false; }
-  float illuminance = (Wire.read() << 8) | Wire.read();
-  illuminance /= (1.2 * (69 / (float)VEML7700.mtreg));
-  if (1 == Settings.SensorBits1.VEML7700_resolution) {
-    illuminance /= 2;
-  }
-  VEML7700.illuminance = illuminance;
-
-  VEML7700.valid = SENSOR_MAX_MISS;
-  return true;
-}
-
-/********************************************************************************************/
-
-void VEML7700Detect(void)
-{
-  for (uint32_t i = 0; i < sizeof(VEML7700.addresses); i++) {
-    VEML7700.address = VEML7700.addresses[i];
-    if (I2cActive(VEML7700.address)) { continue; }
-
-    if (VEML7700SetMTreg()) {
-      I2cSetActiveFound(VEML7700.address, VEML7700.types);
-      VEML7700.type = 1;
-      break;
-    }
-  }
-}
-
-void VEML7700EverySecond(void)
-{
-  // 1mS
-  if (!VEML7700Read()) {
-    AddLogMissed(VEML7700.types, VEML7700.valid);
-  }
-}
-
-/*********************************************************************************************\
- * Command Sensor10
- *
- * 0       - High resolution mode (default)
- * 1       - High resolution mode 2
- * 2       - Low resolution mode
- * 31..254 - Measurement Time value (not persistent, default is 69)
-\*********************************************************************************************/
-
-bool VEML7700CommandSensor(void)
-{
-  if (XdrvMailbox.data_len) {
-    if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 2)) {
-      Settings.SensorBits1.VEML7700_resolution = XdrvMailbox.payload;
-      VEML7700SetResolution();
-    }
-    else if ((XdrvMailbox.payload > 30) && (XdrvMailbox.payload < 255)) {
-      VEML7700.mtreg = XdrvMailbox.payload;
-      VEML7700SetMTreg();
-    }
-  }
-  Response_P(PSTR("{\"" D_CMND_SENSOR "10\":{\"Resolution\":%d,\"MTime\":%d}}"), Settings.SensorBits1.VEML7700_resolution, VEML7700.mtreg);
-
-  return true;
-}
-
-void VEML7700Show(bool json)
-{
-  if (VEML7700.valid) {
-    if (json) {
-      ResponseAppend_P(JSON_SNS_ILLUMINANCE, VEML7700.types, VEML7700.illuminance);
-#ifdef USE_DOMOTICZ
-      if (0 == tele_period) {
-        DomoticzSensor(DZ_ILLUMINANCE, VEML7700.illuminance);
-      }
-#endif  // USE_DOMOTICZ
 #ifdef USE_WEBSERVER
-    } else {
-      WSContentSend_PD(HTTP_SNS_ILLUMINANCE, VEML7700.types, VEML7700.illuminance);
-#endif  // USE_WEBSERVER
-    }
+const char HTTP_SNS_VEML7700[] PROGMEM =
+  "{s}VEML7700 " D_lux_value "{m}%d lx{e}" // {s} = <tr><th>, {m} = </th><td>, {e} = </td></tr>
+  "{s}VEML7700 " D_nits_value "{m}%d nt{e}"
+  "{s}VEML7700 " D_white_value "{m}%d{e}"
+  "{s}VEML7700 " D_rawals_value "{m}%d{e}";
+  #endif  // USE_WEBSERVER
+
+void Veml7700Show(boolean json)
+{
+  if (!veml7700_ready) {
+    return;
+  }
+  if (json) {
+    ResponseAppend_P(PSTR(",\"VEML7700\":{\"" D_JSON_lux_value "\":%d,\"" D_JSON_nits_value "\":%d,\"" D_JSON_white_value "\":%d,\"" D_JSON_rawals_value "\":%d}"), lux_value, nits_value, white_value, rawals_value);
+#ifdef USE_WEBSERVER
+  } else {
+    WSContentSend_PD(HTTP_SNS_VEML7700, lux_value, nits_value, white_value, rawals_value);
+#endif
   }
 }
+
 
 /*********************************************************************************************\
  * Interface
 \*********************************************************************************************/
 
-bool Xsns10(uint8_t function)
+bool Xsns68(byte function)
 {
-  if (!I2cEnabled(XI2C_68)) { return false; }
-
   bool result = false;
 
-  if (FUNC_INIT == function) {
-    VEML7700Detect();
-  }
-  else if (VEML7700.type) {
+  if (i2c_flg) {
     switch (function) {
-      case FUNC_EVERY_SECOND:
-        VEML7700EverySecond();
+      case FUNC_INIT:
+        Veml7700Detect();
         break;
-      case FUNC_COMMAND_SENSOR:
-        if (XSNS_10 == XdrvMailbox.index) {
-          result = VEML7700CommandSensor();
-        }
+      case FUNC_EVERY_SECOND:
+        Veml7700_Every_Second();
+        break;
+      case FUNC_COMMAND:
         break;
       case FUNC_JSON_APPEND:
-        VEML7700Show(1);
+        Veml7700Show(1);
         break;
 #ifdef USE_WEBSERVER
       case FUNC_WEB_SENSOR:
-        VEML7700Show(0);
+        Veml7700Show(0);
         break;
 #endif  // USE_WEBSERVER
     }
