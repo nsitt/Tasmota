@@ -1,3 +1,6 @@
 [submodule "lib/Adafruit_VEML7700"]
 	path = lib/Adafruit_VEML7700
 	url = https://github.com/adafruit/Adafruit_VEML7700
+[submodule "lib/Adafruit_BusIO"]
+	path = lib/Adafruit_BusIO
+	url = https://github.com/adafruit/Adafruit_BusIO
